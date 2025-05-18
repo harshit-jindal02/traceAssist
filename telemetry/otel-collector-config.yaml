@@ -5,16 +5,13 @@ receivers:
       http:
 
 exporters:
+  zipkin:
+    # Send Zipkin-format spans to Jaeger’s Zipkin listener
+    endpoint: "http://jaeger:9411/api/v2/spans"
   prometheus:
-    endpoint: "0.0.0.0:8888"
+    endpoint: "0.0.0.0:9888"
   loki:
     endpoint: http://loki:3100/loki/api/v1/push
-  otlp/tempo:
-    endpoint: tempo:4317
-    tls:
-      insecure: true
-  debug:
-    verbosity: detailed
 
 processors:
   batch:
@@ -24,12 +21,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp/tempo, debug]
+      exporters: [zipkin]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus, debug]
+      exporters: [prometheus]
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [loki, debug]
+      exporters: [loki]

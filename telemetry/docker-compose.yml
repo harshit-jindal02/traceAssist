@@ -1,26 +1,23 @@
-version: '3.7'
-
 services:
-
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
     ports:
-      - "4317:4317"     # OTLP gRPC
-      - "8888:8888"     # Prometheus scrape endpoint
-    depends_on:
-      - tempo
-      - loki
-      - prometheus
+      - "4317:4317"
+      - "9888:9888"
+    networks:
+      - telemetry
 
   prometheus:
     image: prom/prometheus:latest
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
       - "9090:9090"
+    networks:
+      - telemetry
 
   grafana:
     image: grafana/grafana:latest
@@ -31,26 +28,27 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
-    depends_on:
-      - prometheus
-      - tempo
-      - loki
+    networks:
+      - telemetry
 
-  tempo:
-    image: grafana/tempo:latest
-    command: ["-config.file=/etc/tempo.yaml"]
-    volumes:
-      - tempo-data:/tmp/tempo
+  jaeger:
+    image: jaegertracing/all-in-one:latest
     ports:
-      - "3200:3200"  # Tempo HTTP
-      - "4318:4318"  # OTLP HTTP
+      - "16686:16686"
+      - "14250:14250"
+    networks:
+      - telemetry
 
   loki:
     image: grafana/loki:2.9.1
     ports:
       - "3100:3100"
-    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - telemetry
 
 volumes:
   grafana-storage:
-  tempo-data:
+
+networks:
+  telemetry:
+    driver: bridge
