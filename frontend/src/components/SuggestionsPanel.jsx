@@ -1,45 +1,38 @@
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-export default function SuggestionsPanel() {
+export default function SuggestionsPanel({ appId }) {
   const [suggestions, setSuggestions] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    async function fetchSuggestions() {
-      const res = await axios.get('http://localhost:8000/suggestions');
+  const fetchSuggestions = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`http://localhost:8000/suggestions?app_id=${encodeURIComponent(appId)}`);
       setSuggestions(res.data.suggestions || []);
+    } catch (err) {
+      console.error('Error fetching suggestions:', err.response?.data || err.message);
+      alert('Failed to fetch AI suggestions. Check console.');
+    } finally {
+      setLoading(false);
     }
-    fetchSuggestions();
-  }, []);
-
-  const handleAction = async (id, action) => {
-    await axios.post(`http://localhost:8000/suggestions/${id}/${action}`);
-    alert(`Suggestion ${action}ed`);
   };
 
+  useEffect(() => {
+    if (appId) {
+      fetchSuggestions();
+    }
+  }, [appId]);
+
+  if (loading) return <p>Loading AI suggestions…</p>;
+
   return (
-    <div className="bg-white p-4 rounded shadow mb-6">
-      <h2 className="text-xl font-semibold mb-2">AI Suggestions</h2>
-      {suggestions.length === 0 && <p>No suggestions available.</p>}
-      {suggestions.map((sug, idx) => (
-        <div key={idx} className="border p-3 rounded mb-2">
-          <p>{sug.text}</p>
-          <div className="mt-2">
-            <button
-              onClick={() => handleAction(sug.id, 'accept')}
-              className="bg-green-600 text-white px-3 py-1 rounded mr-2"
-            >
-              Accept
-            </button>
-            <button
-              onClick={() => handleAction(sug.id, 'reject')}
-              className="bg-red-600 text-white px-3 py-1 rounded"
-            >
-              Reject
-            </button>
-          </div>
-        </div>
-      ))}
+    <div className="mb-8">
+      <h2 className="text-2xl font-semibold mb-2">AI Suggestions</h2>
+      {suggestions.length > 0
+        ? suggestions.map((s, i) => <p key={i} className="mb-1">• {s}</p>)
+        : <p>No suggestions available.</p>
+      }
     </div>
   );
 }

@@ -1,65 +1,38 @@
-# 📁 ai_agent/main.py
+# ai-agent/main.py
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from openai import OpenAI
+import openai
 import os
-import logging
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 app = FastAPI()
 
-# Load OpenAI API key from environment variables
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=OPENAI_API_KEY)
+# ─── CORS ───────────────────────────────────────────────────────────────────────
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173", "http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# ────────────────────────────────────────────────────────────────────────────────
 
-# Setup logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ai-agent")
-
-class CodeContext(BaseModel):
-    language: str
-    code_snippet: str
-    framework: str | None = None
+class SuggestRequest(BaseModel):
+    app_id: str
+    # add other fields (code snippet, files) as needed
 
 @app.post("/suggest")
-async def suggest_instrumentation(context: CodeContext):
-    logger.info("Received code for AI instrumentation suggestion.")
-
-    prompt = f"""
-You are an expert software observability engineer. Given the following {context.language} code snippet,
-suggest improvements to add observability using OpenTelemetry. 
-Highlight relevant code areas and explain briefly why each change is needed. If no improvement is needed, say so.
-
----
-CODE:
-{context.code_snippet}
----
-
-Respond with a JSON object like:
-{{
-  "suggestions": [
-    {{ "line": X, "change": "<code change>", "reason": "<why>" }},
-    ...
-  ]
-}}
-"""
-
+async def suggest(req: SuggestRequest):
     try:
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a helpful AI for suggesting code instrumentation."},
-                {"role": "user", "content": prompt},
-            ]
+        completion = openai.ChatCompletion.create(
+            model="gpt-4", 
+            messages=[{"role":"system","content":"You are an observability expert."},
+                      {"role":"user","content":f"Instrument code improvements for app {req.app_id}"}]
         )
-
-        ai_output = response.choices[0].message.content
-        logger.info("AI suggestions returned successfully.")
-        return {"ai_suggestions": ai_output}
-
+        suggestions = [choice.message.content for choice in completion.choices]
+        return {"suggestions": suggestions}
     except Exception as e:
-        logger.error(f"Error during AI instrumentation suggestion: {e}")
-        return {"error": "AI suggestion failed. Please try again."}
-
-
-# Run with: uvicorn main:app --host 0.0.0.0 --port 8200
+        raise HTTPException(status_code=500, detail=str(e))

@@ -1,1 +1,4 @@
 ai-agent/.env
+backend/venv
+user-apps/*
+ai-agent/venv
