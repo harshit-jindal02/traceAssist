@@ -1,5 +1,6 @@
 ai-agent/.env
 backend/venv
+backend/.env
 user-apps/*
 ai-agent/venv
 ai-agent.log
