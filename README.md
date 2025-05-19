@@ -87,10 +87,13 @@ Ensure you have installed:
    cd traceAssist
    ```
 
-2. Create your OpenAI key file for the AI-Agent:
+2. Create your OpenAI key file for the AI-Agent and backend:
 
    ```bash
    cat <<EOF > ai-agent/.env
+   OPENAI_API_KEY=sk-<YOUR_OPENAI_API_KEY>
+   EOF
+   cat <<EOF > backend/.env
    OPENAI_API_KEY=sk-<YOUR_OPENAI_API_KEY>
    EOF
    ```
@@ -180,11 +183,11 @@ For Python or Java, adjust port accordingly (e.g. `8000`).
 ### Add Data Sources in Grafana
 
 - **Prometheus**
-  - URL: [http://prometheus:9090](http://prometheus:9090)
+  - URL: [http://localhost:9090](http://localhost:9090)
 - **Loki**
-  - URL: [http://loki:3100](http://loki:3100)
+  - URL: [http://localhost:3100](http://localhost:3100)
 - **Jaeger**
-  - URL: [http://jaeger:16686](http://jaeger:16686)
+  - URL: [http://localhost:16686](http://localhost:16686)
 
 Click **Save & Test** for each → you should see “Data source is working”.
 
