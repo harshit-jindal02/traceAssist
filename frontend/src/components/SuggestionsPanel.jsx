@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Box, Typography } from '@mui/material';
 import axios from 'axios';
 
 export default function SuggestionsPanel({ appId }) {
@@ -27,12 +28,12 @@ export default function SuggestionsPanel({ appId }) {
   if (loading) return <p>Loading AI suggestions…</p>;
 
   return (
-    <div className="mb-8">
-      <h2 className="text-2xl font-semibold mb-2">AI Suggestions</h2>
+    <Box>
+      <Typography variant='h4'>AI Suggestions</Typography>
       {suggestions.length > 0
-        ? suggestions.map((s, i) => <p key={i} className="mb-1">• {s}</p>)
+        ? suggestions.map((s, i) => <p key={i}>• {s}</p>)
         : <p>No suggestions available.</p>
       }
-    </div>
+    </Box>
   );
 }

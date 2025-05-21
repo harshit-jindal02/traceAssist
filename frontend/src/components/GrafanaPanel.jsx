@@ -1,16 +1,16 @@
-import React from 'react';
+import { Box, Typography } from '@mui/material';
 
 export default function GrafanaPanel({ dashboardUid }) {
   return (
-    <div className="mb-12">
-      <h2 className="text-2xl font-semibold mb-2">Grafana Dashboard</h2>
+    <Box height={'70vh'}>
+      <Typography variant='h4'>Grafana Dashboard</Typography>
       <iframe
         src={`http://localhost:3000/d/${dashboardUid}?orgId=1&kiosk`}
         width="100%"
-        height="600"
+        height="95%"
         frameBorder="0"
         title="Grafana Dashboard"
       />
-    </div>
+    </Box>
   );
 }

@@ -52,6 +52,8 @@ TraceAssist lets you:
   - **Jaeger All-in-One** (traces)  
   - **Grafana** (dashboard)  
 
+![](assets/images/FlowDiagram.png)
+
 ---
 
 ## Tech Stack
@@ -75,7 +77,7 @@ Ensure you have installed:
 - **Git**  
 - **Docker & Docker Compose** (v1.27+)  
 - **Node.js 18+** & **npm**  
-- **Python 3.9+**  
+- **Python 3.9+** & **pip**
 
 ---
 
