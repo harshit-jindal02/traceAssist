@@ -1,78 +1,75 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
-# ─── Ensure we're in the repo root ─────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# 1. Point Docker to Minikube’s daemon
+echo "🔧 Configuring Docker to use Minikube..."
+eval $(minikube docker-env)
 
-# ─── Load AI-Agent .env if present ─────────────────────────────────────────────
-if [ -f ai-agent/.env ]; then
-  echo "🔑 Loading environment variables from ai-agent/.env"
-  set -o allexport
-  source ai-agent/.env
-  set +o allexport
-fi
+# 2. Build your service images
+echo "📦 Building backend image..."
+docker build -t traceassist-backend:latest backend/
+echo "📦 Building AI-Agent image..."
+docker build -t traceassist-ai-agent:latest ai-agent/
+echo "📦 Building frontend image..."
+docker build -t traceassist-frontend:latest frontend/
 
-# Check that OPENAI_API_KEY is now set
-if [ -z "${OPENAI_API_KEY-}" ]; then
-  echo "❌ Missing OPENAI_API_KEY. Please add it to ai-agent/.env as:"
-  echo "    OPENAI_API_KEY=sk-..."
-  exit 1
-fi
+# 3. Create namespaces
+echo "📂 Ensuring namespaces exist..."
+kubectl create namespace signoz     --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace traceassist --dry-run=client -o yaml | kubectl apply -f -
 
-echo "🛠  Starting full TraceAssist setup..."
+# 4. Install SigNoz via Helm
+echo "🚀 Installing SigNoz..."
+helm repo add signoz https://charts.signoz.io
+helm repo update
+helm upgrade --install signoz signoz/signoz \
+  --namespace signoz \
+  --wait --timeout=1h \
+  -f k8s/signoz-values.yaml
 
-# ─── 1) Telemetry Stack ───────────────────────────────────────────────────────
-echo "🔧  1) Launching telemetry stack..."
-docker network inspect telemetry >/dev/null 2>&1 || docker network create telemetry
-cd telemetry
-docker-compose up -d
-cd ..
+# 5. Install cert-manager (for Operator webhook certificates)
+echo "🔐 Installing cert-manager..."
+kubectl apply --validate=false \
+  -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
 
-# ─── 2) Backend API ────────────────────────────────────────────────────────────
-echo "🔧  2) Setting up Backend..."
-if [ ! -d backend/venv ]; then
-  python3 -m venv backend/venv
-fi
-backend/venv/bin/pip install --upgrade pip
-backend/venv/bin/pip install -r backend/requirements.txt
+echo "⏳ Waiting for cert-manager webhook..."
+kubectl -n cert-manager rollout status deployment cert-manager-webhook --timeout=2m
 
-echo "🚀  Starting Backend on http://localhost:8000 ..."
-nohup backend/venv/bin/uvicorn backend.main:app \
-  --host 0.0.0.0 --port 8000 \
-  > backend.log 2>&1 &
+# 6. Install the OpenTelemetry Operator (with CRDs & webhook)
+echo "🔧 Installing OpenTelemetry Operator..."
+helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+helm repo update
+helm upgrade --install opentelemetry-operator open-telemetry/opentelemetry-operator \
+  --namespace opentelemetry-operator-system --create-namespace \
+  --set installCRDs=true \
+  --set webhook.certManager.enabled=true \
+  --set webhook.autoGenerateCert=true
 
-# ─── 3) AI-Agent Service ──────────────────────────────────────────────────────
-echo "🔧  3) Setting up AI-Agent..."
-if [ ! -d ai-agent/venv ]; then
-  python3 -m venv ai-agent/venv
-fi
-ai-agent/venv/bin/pip install --upgrade pip
-ai-agent/venv/bin/pip install -r ai-agent/requirements.txt
+echo "⏳ Waiting for Operator to be ready..."
+kubectl -n opentelemetry-operator-system rollout status deployment/opentelemetry-operator-controller-manager --timeout=2m
 
-echo "🚀  Starting AI-Agent on http://localhost:8200 ..."
-nohup ai-agent/venv/bin/uvicorn ai-agent.main:app \
-  --host 0.0.0.0 --port 8200 \
-  > ai-agent.log 2>&1 &
+# 7. Apply your Collector & Instrumentation CRs
+echo "📡 Deploying OpenTelemetryCollector & Instrumentation..."
+kubectl apply -f k8s/otel-collector.yaml
+kubectl apply -f k8s/instrumentation.yaml
 
-# ─── 4) Frontend UI ────────────────────────────────────────────────────────────
-echo "🔧  4) Setting up Frontend..."
-cd frontend
-npm install
-echo "🚀  Starting Frontend on http://localhost:5173 ..."
-nohup npm run dev > frontend.log 2>&1 &
-cd ..
+# 8. Deploy your TraceAssist services
+echo "🚀 Deploying TraceAssist services..."
+kubectl apply -n traceassist \
+  -f k8s/backend-deployment.yaml \
+  -f k8s/backend-service.yaml \
+  -f k8s/ai-agent-deployment.yaml \
+  -f k8s/ai-agent-service.yaml \
+  -f k8s/frontend-deployment.yaml \
+  -f k8s/frontend-service.yaml
 
-# ─── Done ──────────────────────────────────────────────────────────────────────
 echo
-echo "✅  Setup complete!"
+echo "✅ All deployed!"
 echo
-echo "  • Frontend UI:     http://localhost:5173"
-echo "  • Backend API:     http://localhost:8000/docs"
-echo "  • AI-Agent API:    http://localhost:8200/docs"
-echo "  • Grafana:         http://localhost:3000  (admin/admin)"
-echo "  • Prometheus:      http://localhost:9090"
-echo "  • Jaeger UI:       http://localhost:16686"
-echo "  • Loki UI:         http://localhost:3100"
+echo "👉 To access your TraceAssist UI:"
+echo "   kubectl -n traceassist port-forward svc/traceassist-frontend 5173:5173"
+echo "   open http://localhost:5173"
 echo
-echo "Logs are in: backend.log, ai-agent.log, frontend.log"
+echo "👉 To access the SigNoz observability dashboard:"
+echo "   kubectl -n signoz port-forward svc/signoz 8080:8080"
+echo "   open http://localhost:8080"

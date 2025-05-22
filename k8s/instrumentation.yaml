@@ -1,0 +1,22 @@
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: traceassist-auto
+  namespace: traceassist
+spec:
+  # Send all signals (traces, metrics, logs) to our collector service
+  exporter:
+    endpoint: http://traceassist-collector.traceassist.svc.cluster.local:4317
+  # 100% sampling
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+  # (optional) common propagators
+  propagators:
+    - tracecontext
+    - baggage
+
+  # enable auto-instrumentation for each runtime
+  nodejs: {}
+  python: {}
+  java: {}

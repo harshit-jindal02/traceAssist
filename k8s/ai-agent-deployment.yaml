@@ -1,0 +1,25 @@
+# k8s/ai-agent-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traceassist-ai-agent
+  namespace: traceassist
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traceassist-ai-agent
+  template:
+    metadata:
+      labels:
+        app: traceassist-ai-agent
+    spec:
+      containers:
+        - name: ai-agent
+          image: traceassist-ai-agent:latest
+          imagePullPolicy: Never
+          envFrom:
+            - secretRef:
+                name: ai-agent-secret
+          ports:
+            - containerPort: 8200

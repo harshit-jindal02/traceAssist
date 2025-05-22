@@ -1,0 +1,7 @@
+global:
+  # Minikube’s built-in hostPath StorageClass
+  storageClass: standard
+
+clickhouse:
+  # don’t try to install a new StorageClass on Minikube
+  installCustomStorageClass: false

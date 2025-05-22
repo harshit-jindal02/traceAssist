@@ -1,18 +1,15 @@
-# Use official Python image
+# backend/Dockerfile
 FROM python:3.10-slim
-
-# Set workdir inside container
 WORKDIR /app
 
-# Copy and install dependencies
+# Copy requirements.txt from backend/ into /app
 COPY requirements.txt .
+
+# Install deps
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all source files
+# Copy the rest of your FastAPI code
 COPY . .
 
-# Expose port
-EXPOSE 8000
-
-# Start FastAPI using uvicorn
+# Run the server
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
