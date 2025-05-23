@@ -37,16 +37,14 @@ kubectl -n cert-manager rollout status deployment cert-manager-webhook --timeout
 
 # 6. Install the OpenTelemetry Operator (with CRDs & webhook)
 echo "🔧 Installing OpenTelemetry Operator..."
+# kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/latest/download/crds.yaml
 helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
 helm repo update
 helm upgrade --install opentelemetry-operator open-telemetry/opentelemetry-operator \
-  --namespace opentelemetry-operator-system --create-namespace \
-  --set installCRDs=true \
-  --set webhook.certManager.enabled=true \
-  --set webhook.autoGenerateCert=true
+  --namespace opentelemetry-operator-system --create-namespace
 
 echo "⏳ Waiting for Operator to be ready..."
-kubectl -n opentelemetry-operator-system rollout status deployment/opentelemetry-operator-controller-manager --timeout=2m
+# kubectl -n opentelemetry-operator-system rollout status deployment/opentelemetry-operator-controller-manager --timeout=2m
 
 # 7. Apply your Collector & Instrumentation CRs
 echo "📡 Deploying OpenTelemetryCollector & Instrumentation..."
