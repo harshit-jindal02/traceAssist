@@ -1,0 +1,55 @@
+# k8s/otel-collector-config.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: traceassist
+data:
+  otel-collector-config: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: {}
+          http: {}
+
+      filelog:
+        include:
+          - /var/lib/docker/containers/*/*.log
+        start_at: beginning
+        include_file_name: true
+
+      hostmetrics:
+        collection_interval: 30s
+        scrapers:
+          cpu: {}
+          memory: {}
+          network: {}
+          disk: {}
+          load: {}
+          filesystem: {}           # use default filesystem scraper settings :contentReference[oaicite:0]{index=0}
+
+    processors:
+      batch: {}
+
+    exporters:
+      otlp:
+        endpoint: https://ingest.in.signoz.cloud:4317
+        tls:
+          insecure: false
+        headers:
+          signoz-ingestion-key: "e9bfcba0-a5a1-4d45-b2d5-38d332625ac8"
+
+    service:
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp]
+        metrics:
+          receivers: [otlp, hostmetrics]
+          processors: [batch]
+          exporters: [otlp]
+        logs:
+          receivers: [filelog]
+          processors: [batch]
+          exporters: [otlp]
