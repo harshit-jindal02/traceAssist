@@ -1,112 +1,152 @@
 
 # 🚀 TraceAssist
 
-**TraceAssist** is a Kubernetes-native observability helper that lets developers automatically instrument, analyze, and visualize their applications. Developers can upload a ZIP of their code or provide a repo link; TraceAssist will deploy the app in-cluster, auto-instrument it with OpenTelemetry, and surface AI-powered suggestions. Metrics, logs, and traces are displayed in a SigNoz dashboard embedded in the UI.
+[![SigNoz](https://img.shields.io/badge/Observability-SigNoz-orange.svg)](https://signoz.io/)  
+[![OpenTelemetry](https://img.shields.io/badge/Telemetry-OpenTelemetry-lightgrey.svg)](https://opentelemetry.io/)
+
+**TraceAssist** is a Kubernetes-native observability helper that automatically instruments your Java, Node.js, or Python applications, ships traces, metrics & logs to SigNoz Cloud, and even suggests manual instrumentation via AI. All you do is point TraceAssist at your un-instrumented code (zip or GitHub repo) and hit **Instrument**—we handle the rest!
 
 ---
 
-## 🚀 Features
+## 📋 Table of Contents
 
-* **Zero-touch instrumentation** via the OpenTelemetry Operator
-* **AI-driven suggestions** for improving observability (built with OpenAI)
-* **Single-pane observability** using SigNoz (replaces Prometheus, Jaeger, Grafana, Loki)
-* **Kubernetes-native**: runs entirely in Minikube (or any K8s cluster)
-* **One-click deploy** with `run.sh` and tear-down with `cleanup.sh`
-
----
-
-## 📋 Prerequisites
-
-* [Minikube](https://minikube.sigs.k8s.io/docs/) (v1.30+)
-* [kubectl](https://kubernetes.io/docs/tasks/tools/)
-* [Helm](https://helm.sh/docs/helm/helm_install/)
-* Docker (for building images into Minikube)
-* [OpenAI API key](https://platform.openai.com/account/api-keys)
-* `backend/.env` and `ai-agent/.env` files containing at least:
-
-  ```dotenv
-  OPENAI_API_KEY=sk-...
-  ```
+- [✨ Features](#✨-features)  
+- [🏗️ Architecture](#️-architecture)  
+- [⚙️ Prerequisites](#️-prerequisites)  
+- [🚀 Quick Start](#-quick-start)  
+  - [1. Clone & Configure](#1-clone--configure)  
+  - [2. Deploy to Minikube](#2-deploy-to-minikube)  
+  - [3. Instrument a User App](#3-instrument-a-user-app)  
+- [🛠️ Configuration](#️-configuration)  
+- [🧹 Cleanup](#️-cleanup)  
+- [🤝 Contributing](#️-contributing)  
+- [📄 License](#-license)  
 
 ---
 
-## 🛠 Setup & Deployment
+## ✨ Features
 
-1. **Clone the repo**
-
-   ```bash
-   git clone https://github.com/harshit-jindal02/traceAssist.git
-   cd traceAssist
-   ```
-
-2. **Start Minikube**
-
-   ```bash
-   minikube start --cpus=4 --memory=8192
-   eval $(minikube docker-env)
-   ```
-
-3. **Prepare environment Secrets**
-
-   ```bash
-   kubectl create namespace traceassist || true
-   kubectl -n traceassist create secret generic backend-secret --from-env-file=backend/.env
-   kubectl -n traceassist create secret generic ai-agent-secret --from-env-file=ai-agent/.env
-   ```
-
-4. **Deploy everything**
-
-   ```bash
-   chmod +x run.sh
-   ./run.sh
-   ```
-
-   This will:
-
-   * Build and load Docker images into Minikube
-   * Install SigNoz via Helm
-   * Install cert-manager and the OpenTelemetry Operator (with CRDs)
-   * Apply your OpenTelemetryCollector and Instrumentation CRDs
-   * Deploy the `backend`, `ai-agent`, and `frontend` services in the `traceassist` namespace
+- **Auto-Instrumentation** of Java / Node.js / Python apps via the OTel Operator  
+- **AI-Driven Suggestions** for manual instrumentation (powered by OpenAI)  
+- **Traces & Metrics → SigNoz Cloud** using OTLP sidecars  
+- **Logs Tailored** via Collector DaemonSet & `filelog` receiver  
+- **Host & Node Metrics** (CPU, memory, filesystem, network, load)  
+- **One-Click Cleanup** script to tear down all resources  
 
 ---
 
-## 🔍 Accessing the UIs
+## 🏗️ Architecture
 
-* **TraceAssist UI** (frontend):
+```
+User App (zip / Git Repo)
+│
+▼
+TraceAssist Backend ──► Kubernetes Manifests (deployment+service .yaml)
+│
+├── OpenTelemetry Operator (auto-inject sidecars)
+│
+└── Collector DaemonSet
+    ├─ Receivers: OTLP, filelog, hostmetrics
+    ├─ Processors: batch
+    └─ Exporter: OTLP → SigNoz Cloud
+```
 
-  ```bash
-  kubectl -n traceassist port-forward svc/traceassist-frontend 5173:5173
-  # Open http://localhost:5173
-  ```
+- **Backend**: FastAPI service that clones or uploads code, renders Jinja2 K8s templates, invokes `kubectl apply`, calls OpenAI.  
+- **Operator + Instrumentation CR**: Auto-injects the correct OTel SDK for each runtime.  
+- **Collector DaemonSet**: Runs on each node (hostNetwork), tails container logs, scrapes infra metrics, and exports everything to SigNoz.
 
-* **Observability dashboard** (SigNoz):
+---
 
-  ```bash
-  kubectl -n signoz port-forward svc/signoz 8080:8080
-  # Open http://localhost:8080
-  ```
+## ⚙️ Prerequisites
 
-In the TraceAssist UI you can upload ZIPs or clone repos, trigger auto-instrumentation, run the app, and view AI suggestions.
+- [Minikube](https://minikube.sigs.k8s.io/docs/) (with Docker driver)  
+- `kubectl` CLI  
+- `helm` CLI  
+- Docker (local)  
+- SigNoz Cloud account & **Ingestion Key**  
+- OpenAI API Key (for AI suggestions)  
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone & Configure
+
+```bash
+git clone https://github.com/harshit-jindal02/traceAssist.git
+cd traceAssist
+cp .env.sample .env
+# Edit .env:
+#   OPENAI_API_KEY=sk-…
+#   SIGNOZ_CLOUD_ENDPOINT=ingest.signoz.cloud:4317
+#   SIGNOZ_CLOUD_API_KEY=<YOUR_SIGNOZ_INGESTION_KEY>
+```
+
+### 2. Deploy to Minikube
+
+```bash
+chmod +x ./run.sh
+eval "$(minikube docker-env)"
+./run.sh
+```
+
+This will:
+- Build your backend, AI-agent & frontend images
+- Install SigNoz (Helm chart) in `signoz` ns
+- Install cert-manager & OTel Operator
+- Apply your Collector DaemonSet and Instrumentation CR
+- Deploy TraceAssist services in `traceassist` ns
+
+### 3. Instrument a User App
+
+1. Visit: `http://localhost:5173` (TraceAssist UI)
+2. **Upload Zip** or **Clone GitHub Repo** (e.g. `https://github.com/heroku/node-js-getting-started.git`)
+3. Click **Instrument** → watch your app deploy in `traceassist` ns
+4. Visit **SigNoz** dashboard (logs / metrics / traces)
+
+---
+
+## 🛠️ Configuration
+
+| Component              | File                                | Purpose                                        |
+|------------------------|-------------------------------------|------------------------------------------------|
+| AI Suggestions         | backend/.env                        | OPENAI_API_KEY                                 |
+| SigNoz Exporter        | run.sh & Deployment YAMLs           | SIGNOZ_CLOUD_ENDPOINT & SIGNOZ_CLOUD_API_KEY   |
+| Collector Config       | k8s/otel-collector-config.yaml      | Receivers, processors, exporters (logs+infra)  |
+| Collector DaemonSet    | k8s/otel-collector-daemonset.yaml   | Mount hostFS, docker logs, privileged mode     |
+| Instrumentation CR     | k8s/instrumentation.yaml            | Auto-inject SDK sidecars                       |
+
+Adjust resource requests/limits, scrape intervals, and file patterns as needed.
 
 ---
 
 ## 🧹 Cleanup
 
-To tear down everything:
-
 ```bash
-chmod +x cleanup.sh
+chmod +x ./cleanup.sh
 ./cleanup.sh
 ```
 
-This will uninstall SigNoz and delete the `traceassist` namespace.
+This will:
+- Stop lingering `kubectl port-forward`
+- Delete all k8s resources & namespaces
+- Uninstall Helm releases (`signoz`, `opentelemetry-operator`, `cert-manager`)
+- Remove OTel Collector DaemonSet & ConfigMap
+- Prune built Docker images in Minikube
+- Remove local `k8s/` manifests & `user-apps/` directory
 
 ---
 
-## 📝 Troubleshooting
+## 🤝 Contributing
 
-* **Pods Pending**: Ensure images are built into Minikube (`eval $(minikube docker-env)` runs in your shell before `run.sh`).
-* **ImagePullBackOff**: Check `imagePullPolicy: Never` is set in each deployment YAML.
-* **Operator webhook errors**: Verify cert-manager is running in `cert-manager` namespace.
-* **Missing OPENAI\_API\_KEY**: Confirm `.env` files are populated and Secrets are created.
+- Fork the repo and create your feature branch
+- Write code, tests & update documentation
+- Submit a pull request — we’ll review & merge!
+
+Please follow the Contributor Covenant and our code style guidelines.
+
+---
+
+
+Made by Harshit Jindal.
+Empowering developers to instrument in one click!
