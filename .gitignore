@@ -8,3 +8,4 @@ ai-agent/__pycache__/
 backend.log
 backend/__pycache__/
 utils/__pycache__/
+.env

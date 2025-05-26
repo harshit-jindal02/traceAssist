@@ -1,39 +1,56 @@
+// frontend/src/components/SuggestionsPanel.jsx
 import React, { useState, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, CircularProgress } from '@mui/material';
 import axios from 'axios';
 
-export default function SuggestionsPanel({ appId }) {
-  const [suggestions, setSuggestions] = useState([]);
+export default function SuggestionsPanel({ apiBase, appId }) {
+  const [suggestions, setSuggestions] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const fetchSuggestions = async () => {
-    setLoading(true);
-    try {
-      const res = await axios.get(`http://localhost:8000/suggestions?app_id=${encodeURIComponent(appId)}`);
-      setSuggestions(res.data.suggestions || []);
-    } catch (err) {
-      console.error('Error fetching suggestions:', err.response?.data || err.message);
-      alert('Failed to fetch AI suggestions. Check console.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchSuggestions = async () => {
+      setLoading(true);
+      try {
+        const res = await axios.post(
+          `${apiBase}/suggestions`,
+          { app_id: appId },
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        setSuggestions(res.data.suggestions || '');
+      } catch (err) {
+        console.error('Error fetching suggestions:', err.response?.data || err.message);
+        alert('Failed to fetch AI suggestions. Check console.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (appId) {
       fetchSuggestions();
     }
-  }, [appId]);
+  }, [apiBase, appId]);
 
-  if (loading) return <p>Loading AI suggestions…</p>;
+  if (loading) {
+    return (
+      <Box textAlign="center" my={2}>
+        <CircularProgress />
+        <Typography>Loading AI suggestions…</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <Box>
-      <Typography variant='h4'>AI Suggestions</Typography>
-      {suggestions.length > 0
-        ? suggestions.map((s, i) => <p key={i}>• {s}</p>)
-        : <p>No suggestions available.</p>
-      }
+    <Box my={2}>
+      <Typography variant="h4" gutterBottom>
+        AI Suggestions
+      </Typography>
+      {suggestions ? (
+        <Typography component="pre" sx={{ whiteSpace: 'pre-wrap' }}>
+          {suggestions}
+        </Typography>
+      ) : (
+        <Typography>No suggestions available.</Typography>
+      )}
     </Box>
   );
 }

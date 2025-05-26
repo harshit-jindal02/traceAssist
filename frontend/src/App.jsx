@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import UploadForm from './components/UploadForm';
 import SuggestionsPanel from './components/SuggestionsPanel';
-import GrafanaPanel from './components/GrafanaPanel';
-import { Box, Typography, Button, Divider, List, ListItem, ListItemIcon, ListItemText } from '@mui/material';
+import SigNozPanel from './components/SigNozPanel';
+import { Box, Typography, Button, Divider } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+
+const API_BASE = 'http://localhost:8000'; // <— change here if your backend endpoint moves
 
 function App() {
   const [appId, setAppId] = useState(null);
@@ -16,14 +18,18 @@ function App() {
 
   const handleInstrumentAndRun = async () => {
     try {
+      // Instrument
       await axios.post(
-        'http://localhost:8000/instrument',
+        `${API_BASE}/instrument`,
         { app_id: appId },
         { headers: { 'Content-Type': 'application/json' } }
       );
+
       setInstrumented(true);
+
+      // Run
       await axios.post(
-        'http://localhost:8000/run',
+        `${API_BASE}/run`,
         { app_id: appId },
         { headers: { 'Content-Type': 'application/json' } }
       );
@@ -53,7 +59,7 @@ function App() {
           boxShadow: 3
         }}
       >
-        {/* Logo */}
+        {/* Logo & Title */}
         <Box
           sx={{
             mb: 3,
@@ -62,7 +68,6 @@ function App() {
             flexDirection: 'column',
           }}
         >
-          {/* Inline SVG logo placeholder */}
           <Box sx={{ mb: 1 }}>
             <svg width="125" height="125" viewBox="0 0 48 48" fill="none">
               <circle cx="24" cy="24" r="22" fill="#4fd1c5" stroke="#fff" strokeWidth="3" />
@@ -70,21 +75,10 @@ function App() {
               <circle cx="24" cy="24" r="4" fill="#fff" stroke="#232b5d" strokeWidth="2" />
             </svg>
           </Box>
-          <Typography
-            variant="h6"
-            color="#fff"
-            fontWeight={700}
-            letterSpacing={1}
-            sx={{ mb: 0.5 }}
-          >
+          <Typography variant="h6" color="#fff" fontWeight={700} letterSpacing={1} sx={{ mb: 0.5 }}>
             Trace Assist
           </Typography>
-          <Typography
-            variant="caption"
-            color="#b0bec5"
-            align="center"
-            sx={{ px: 1 }}
-          >
+          <Typography variant="caption" color="#b0bec5" align="center" sx={{ px: 1 }}>
             AI-Powered Observability
           </Typography>
         </Box>
@@ -123,18 +117,16 @@ function App() {
           >
             Trace Assist Dashboard
           </Typography>
-          <Typography
-            variant="subtitle1"
-            color="text.secondary"
-            sx={{ mb: 3 }}
-          >
+          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 3 }}>
             Accelerate observability with automated, AI-powered instrumentation for your applications.
           </Typography>
 
+          {/* Step 1: Upload or Clone */}
           {!appId && (
-            <UploadForm onAppReady={handleAppReady} />
+            <UploadForm apiBase={API_BASE} onAppReady={handleAppReady} />
           )}
 
+          {/* Step 2: Instrument & Run */}
           {appId && !instrumented && (
             <Button
               variant="contained"
@@ -162,13 +154,14 @@ function App() {
             </Button>
           )}
 
+          {/* Step 3: AI Suggestions & SigNoz */}
           {instrumented && (
             <>
               <Box>
-                <SuggestionsPanel appId={appId} />
+                <SuggestionsPanel apiBase={API_BASE} appId={appId} />
               </Box>
               <Box mt={2}>
-                <GrafanaPanel dashboardUid="YOUR_DASHBOARD_UID" />
+                <SigNozPanel appId={appId} />
               </Box>
             </>
           )}

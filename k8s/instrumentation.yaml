@@ -1,22 +1,16 @@
 apiVersion: opentelemetry.io/v1alpha1
 kind: Instrumentation
 metadata:
-  name: traceassist-auto
+  name: traceassist-auto-instrumentation
   namespace: traceassist
 spec:
-  # Send all signals (traces, metrics, logs) to our collector service
+  # 1) inject the OTLP headers via env
+  env:
+    - name: OTEL_EXPORTER_OTLP_HEADERS
+      value: "Authorization=Bearer e9bfcba0-a5a1-4d45-b2d5-38d332625ac8"
+  # 2) point at the full HTTPS ingest URL
   exporter:
-    endpoint: http://traceassist-collector.traceassist.svc.cluster.local:4317
-  # 100% sampling
-  sampler:
-    type: parentbased_traceidratio
-    argument: "1"
-  # (optional) common propagators
-  propagators:
-    - tracecontext
-    - baggage
-
-  # enable auto-instrumentation for each runtime
+    endpoint: "https://ingest.in.signoz.cloud:4317"
   nodejs: {}
   python: {}
   java: {}

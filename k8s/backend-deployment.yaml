@@ -1,4 +1,3 @@
-# k8s/backend-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,13 +12,32 @@ spec:
     metadata:
       labels:
         app: traceassist-backend
+      annotations:
+        instrumentation.opentelemetry.io/inject: "true"
     spec:
+      serviceAccountName: traceassist-sa
+      volumes:
+        # Share host Docker socket for image builds
+        - name: dockersock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
       containers:
-        - name: backend
+        - name: traceassist-backend
           image: traceassist-backend:latest
-          imagePullPolicy: Never
-          envFrom:
-            - secretRef:
-                name: backend-secret
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: dockersock
+              mountPath: /var/run/docker.sock
+          env:
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secret
+                  key: OPENAI_API_KEY
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "https://ingest.in.signoz.cloud:4317"
+            - name: OTEL_EXPORTER_OTLP_HEADERS
+              value: "Authorization=Bearer e9bfcba0-a5a1-4d45-b2d5-38d332625ac8"
           ports:
             - containerPort: 8000

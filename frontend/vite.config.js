@@ -1,7 +1,14 @@
 import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react-swc'
+import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/upload': 'http://localhost:8000',
+      '/clone':  'http://localhost:8000',
+      '/instrument': 'http://localhost:8000',
+      '/suggestions': 'http://localhost:8000',
+    }
+  }
 })

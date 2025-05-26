@@ -8,24 +8,24 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 import openai
 
-# ─── Environment ────────────────────────────────────────────────────────────────
-load_dotenv()  # load .env first
+# ─── Load environment variables ────────────────────────────────────────────────
+load_dotenv()  # reads .env into os.environ
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4")  # default to gpt-4
+OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4")
 
 if not OPENAI_API_KEY:
     raise RuntimeError("OPENAI_API_KEY not set in environment")
 
 openai.api_key = OPENAI_API_KEY
 
-# ─── Logging ────────────────────────────────────────────────────────────────────
+# ─── Logging setup ─────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s"
 )
 logger = logging.getLogger("ai-agent")
 
-# ─── App & CORS ────────────────────────────────────────────────────────────────
+# ─── FastAPI app & CORS ────────────────────────────────────────────────────────
 app = FastAPI(title="TraceAssist AI Agent")
 
 app.add_middleware(
@@ -47,7 +47,7 @@ class SuggestResponse(BaseModel):
     suggestions: list[str]
     model_used: str
 
-# ─── Endpoint ──────────────────────────────────────────────────────────────────
+# ─── Suggest endpoint ───────────────────────────────────────────────────────────
 @app.post("/suggest", response_model=SuggestResponse)
 async def suggest(req: SuggestRequest):
     logger.info(f"Received suggestion request for app_id={req.app_id}")
@@ -66,7 +66,7 @@ async def suggest(req: SuggestRequest):
             temperature=0.3,
             max_tokens=500,
         )
-        suggestions = [c.message.content.strip() for c in resp.choices]
+        suggestions = [choice.message.content.strip() for choice in resp.choices]
         logger.info(f"AI suggestions generated with model={resp.model}")
         return SuggestResponse(suggestions=suggestions, model_used=resp.model)
 
