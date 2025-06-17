@@ -20,7 +20,10 @@
     "clsx": "^2.1.1",
     "lucide-react": "^0.511.0",
     "react": "^19.1.0",
+    "react-code-blocks": "^0.1.6",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-variants": "^1.0.0"
   },
   "devDependencies": {

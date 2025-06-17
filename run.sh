@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── Load .env (must define SIGNOZ_CLOUD_ENDPOINT and SIGNOZ_CLOUD_API_KEY) ────
-if [ -f .env ]; then
-  echo "🔑 Loading .env"
-  set -o allexport
-  source .env
-  set +o allexport
-fi
+# minikube delete && minikube start --memory=8192 --cpus=4
+# # ─── Load .env (must define SIGNOZ_CLOUD_ENDPOINT and SIGNOZ_CLOUD_API_KEY) ────
+# if [ -f .env ]; then
+#   echo "🔑 Loading .env"
+#   set -o allexport
+#   source .env
+#   set +o allexport
+# fi
 
-if [[ -z "${SIGNOZ_CLOUD_ENDPOINT:-}" || -z "${SIGNOZ_CLOUD_API_KEY:-}" ]]; then
-  echo "ERROR: Please set SIGNOZ_CLOUD_ENDPOINT and SIGNOZ_CLOUD_API_KEY in .env"
-  exit 1
-fi
+# if [[ -z "${SIGNOZ_CLOUD_ENDPOINT:-}" || -z "${SIGNOZ_CLOUD_API_KEY:-}" ]]; then
+#   echo "ERROR: Please set SIGNOZ_CLOUD_ENDPOINT and SIGNOZ_CLOUD_API_KEY in .env"
+#   exit 1
+# fi
 
 # ─── 1. Point Docker to Minikube’s daemon ──────────────────────────────────────
 echo "🔧 Configuring Docker to use Minikube..."
@@ -67,20 +68,37 @@ kubectl -n traceassist apply \
   -f k8s/ai-agent-deployment.yaml \
   -f k8s/ai-agent-service.yaml \
   -f k8s/frontend-deployment.yaml \
-  -f k8s/frontend-service.yaml
+  -f k8s/frontend-service.yaml \
+  -f k8s/otel-collector-config.yaml \
+  -f k8s/otel-collector-daemonset.yaml \
+  -f k8s/otel-collector-infra.yaml
 
 # ─── 8. Restart deployments to pick up new secrets/env vars ────────────────────
 echo "🔄 Restarting backend and AI-Agent deployments..."
 kubectl -n traceassist rollout restart deployment traceassist-backend
 kubectl -n traceassist rollout restart deployment traceassist-ai-agent
 
-# ─── 9. Done! ───────────────────────────────────────────────────────────────
+# ─── 9. Infra-Monitoring Setup ────────────────────
+
+wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.116.0/otelcol-contrib_0.116.0_linux_amd64.tar.gz
+mkdir otelcol-contrib && tar xvzf otelcol-contrib_0.116.0_linux_amd64.tar.gz -C otelcol-contrib
+cd otelcol-contrib/
+cp ../config.yaml .
+./otelcol-contrib --config ./config.yaml &> otelcol-output.log & echo "$!" > otel-pid
+helm repo add signoz https://charts.signoz.io
+helm install my-release signoz/k8s-infra -f override-values.yaml
+
+# ─── 10. Done! ───────────────────────────────────────────────────────────────
 echo
 echo "✅ All components are up."
 echo
 echo "🔗 TraceAssist UI:"
 echo "   kubectl -n traceassist port-forward svc/traceassist-frontend 5173:5173"
 echo "   open http://localhost:5173"
+
+echo "🔗 TraceAssist backend:"
+echo "   kubectl -n traceassist port-forward svc/traceassist-backend 8000:8000"
+echo "   open http://localhost:8000"
 echo
-echo "🌩️  SigNoz Cloud ingestion endpoint:"
-echo "   ${SIGNOZ_CLOUD_ENDPOINT}"
+# echo "🌩️  SigNoz Cloud ingestion endpoint:"
+# echo "   https://ingest.in.signoz.cloud"

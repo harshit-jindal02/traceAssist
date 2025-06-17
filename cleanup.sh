@@ -50,6 +50,7 @@ docker rmi -f otel/opentelemetry-collector-contrib:0.119.0                      
 eval "$(minikube docker-env -u)"
 
 echo "🗑️  Removing local build directories…"
-rm -rf ./k8s ./user-apps
+# rm -rf ./k8s ./user-apps
+rm -rf ./user-apps
 
 echo "✅ All cleanup tasks complete."

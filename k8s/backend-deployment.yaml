@@ -30,6 +30,11 @@ spec:
             - name: dockersock
               mountPath: /var/run/docker.sock
           env:
+            - name: PAT_TOKEN
+              valueFrom:
+                secretKeyRef: 
+                  name: backend-secret
+                  key: PAT_TOKEN
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:

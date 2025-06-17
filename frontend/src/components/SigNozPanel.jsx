@@ -1,7 +1,7 @@
 import React from 'react';
 
 export default function SigNozPanel({ appId }) {
-  const src = `http://localhost:8080/applications?service=user-app-${appId}`;
+  const src = `https://enhanced-coral.in.signoz.cloud/home`;
   return (
     <iframe
       src={src}

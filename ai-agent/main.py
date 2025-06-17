@@ -1,84 +1,102 @@
-# ai-agent/main.py
-
-import os
-import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from dotenv import load_dotenv
-import openai
+# import openai # This line is redundant if you're using "from openai import OpenAI"
+from openai import OpenAI, APIConnectionError, RateLimitError, APIStatusError # Good to import specific errors
+import os
+import logging # Recommended for better error insights
 
-# ─── Load environment variables ────────────────────────────────────────────────
-load_dotenv()  # reads .env into os.environ
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_MODEL   = os.getenv("OPENAI_MODEL", "gpt-4")
+# Configure logging (simple example)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-if not OPENAI_API_KEY:
-    raise RuntimeError("OPENAI_API_KEY not set in environment")
+# --- OpenAI Client Initialization (Robust Version) ---
+openai_api_key_from_env = os.getenv("OPENAI_API_KEY")
+client: OpenAI | None = None # Use | for Union type hint in Python 3.10+ or from typing import Optional
 
-openai.api_key = OPENAI_API_KEY
+if openai_api_key_from_env:
+    cleaned_api_key = openai_api_key_from_env.strip()
+    if cleaned_api_key:
+        try:
+            client = OpenAI(api_key=cleaned_api_key)
+            logger.info("OpenAI client initialized successfully.")
+        except Exception as e:
+            logger.error(f"Failed to initialize OpenAI client: {e}", exc_info=True)
+    else:
+        logger.error("OPENAI_API_KEY environment variable is set but contains only whitespace.")
+else:
+    logger.warning("OPENAI_API_KEY environment variable not found. AI features will be disabled or raise errors.")
+# --- End OpenAI Client Initialization ---
 
-# ─── Logging setup ─────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
-)
-logger = logging.getLogger("ai-agent")
 
-# ─── FastAPI app & CORS ────────────────────────────────────────────────────────
-app = FastAPI(title="TraceAssist AI Agent")
+app = FastAPI()
 
+# ─── CORS ───────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:8000",
-    ],
+    allow_origins=["http://localhost:5173", "http://localhost:8000"], # Consider using ["*"] for dev or more specific origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# ────────────────────────────────────────────────────────────────────────────────
 
-# ─── Models ─────────────────────────────────────────────────────────────────────
 class SuggestRequest(BaseModel):
     app_id: str
+    # add other fields (code snippet, files) as needed
 
 class SuggestResponse(BaseModel):
-    suggestions: list[str]
+    suggestions: str # This expects a list of strings
     model_used: str
+    app_id: str # Good to echo back the app_id
 
-# ─── Suggest endpoint ───────────────────────────────────────────────────────────
-@app.post("/suggest", response_model=SuggestResponse)
+@app.post("/suggestions", response_model=SuggestResponse) # Added response_model
 async def suggest(req: SuggestRequest):
-    logger.info(f"Received suggestion request for app_id={req.app_id}")
-    prompt = (
-        f"You are an observability expert. Provide recommendations for instrumenting "
-        f"the application with ID {req.app_id} in Kubernetes using OpenTelemetry & SigNoz."
-    )
+    if not client:
+        logger.error("OpenAI client not configured. Cannot process /suggestions request.")
+        raise HTTPException(status_code=503, detail="AI service unavailable: OpenAI client not configured.")
 
     try:
-        resp = openai.ChatCompletion.create(
-            model=OPENAI_MODEL,
+        logger.info(f"Requesting suggestions for app_id: {req.app_id}")
+        completion = client.chat.completions.create( # Renamed to 'completion' for clarity
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are an observability expert."},
-                {"role": "user",   "content": prompt},
+                {"role": "user", "content": f"Instrument code improvements for app {req.app_id}"}
             ],
-            temperature=0.3,
-            max_tokens=500,
+            # n=1 is default, but if you change it, this code will still work
         )
-        suggestions = [choice.message.content.strip() for choice in resp.choices]
-        logger.info(f"AI suggestions generated with model={resp.model}")
-        return SuggestResponse(suggestions=suggestions, model_used=resp.model)
 
-    except openai.error.RateLimitError as e:
-        logger.error(f"Rate limit error: {e}")
-        raise HTTPException(status_code=429, detail="OpenAI rate limit exceeded.")
-    except openai.error.APIConnectionError as e:
-        logger.error(f"API connection error: {e}")
-        raise HTTPException(status_code=503, detail="Could not connect to OpenAI API.")
-    except openai.error.OpenAIError as e:
-        logger.error(f"OpenAI API error: {e}")
-        raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+        # Correctly extract all suggestions into a list
+        suggestions_list = [choice.message.content for choice in completion.choices if choice.message and choice.message.content]
+        
+        model_identifier = completion.model # The model string returned by the API
+
+        logger.info(f"Received {len(suggestions_list)} suggestion(s) for app_id: {req.app_id} using model: {model_identifier}")
+
+        return SuggestResponse(
+            suggestions=suggestions_list,
+            model_used=model_identifier,
+            app_id=req.app_id # Echoing back the app_id
+        )
+
+    # More specific error handling (recommended)
+    except APIConnectionError as e:
+        logger.error(f"OpenAI API connection error for app {req.app_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=503, detail=f"AI service connection error: {e.__class__.__name__}")
+    except RateLimitError as e:
+        logger.error(f"OpenAI API rate limit exceeded for app {req.app_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=429, detail="AI service rate limit exceeded. Please try again later.")
+    except APIStatusError as e:
+        err_detail_msg = str(e)
+        try:
+            if e.response and e.response.content:
+                err_detail_json = e.response.json()
+                err_detail_msg = err_detail_json.get("error", {}).get("message", str(e))
+        except Exception:
+            pass # Keep default str(e)
+        logger.error(f"OpenAI API status error for app {req.app_id}: Status {e.status_code}, Response: {e.response.text if e.response else 'N/A'}", exc_info=False)
+        raise HTTPException(status_code=e.status_code if e.status_code else 500, detail=f"AI service API error: {err_detail_msg}")
     except Exception as e:
-        logger.exception("Unexpected error in /suggest")
-        raise HTTPException(status_code=500, detail="Internal server error.")
+        logger.error(f"Unexpected error during AI suggestion for app {req.app_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
