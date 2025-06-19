@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# minikube delete && minikube start --memory=8192 --cpus=4
+minikube delete && minikube start --memory=8192 --cpus=4
 # # ─── Load .env (must define SIGNOZ_CLOUD_ENDPOINT and SIGNOZ_CLOUD_API_KEY) ────
 # if [ -f .env ]; then
 #   echo "🔑 Loading .env"
@@ -83,7 +83,7 @@ kubectl -n traceassist rollout restart deployment traceassist-ai-agent
 wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.116.0/otelcol-contrib_0.116.0_linux_amd64.tar.gz
 mkdir otelcol-contrib && tar xvzf otelcol-contrib_0.116.0_linux_amd64.tar.gz -C otelcol-contrib
 cd otelcol-contrib/
-cp ../config.yaml .
+cd ../config.yaml .
 ./otelcol-contrib --config ./config.yaml &> otelcol-output.log & echo "$!" > otel-pid
 helm repo add signoz https://charts.signoz.io
 helm install my-release signoz/k8s-infra -f override-values.yaml
