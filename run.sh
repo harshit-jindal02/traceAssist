@@ -83,9 +83,10 @@ kubectl -n traceassist rollout restart deployment traceassist-ai-agent
 wget https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v0.116.0/otelcol-contrib_0.116.0_linux_amd64.tar.gz
 mkdir otelcol-contrib && tar xvzf otelcol-contrib_0.116.0_linux_amd64.tar.gz -C otelcol-contrib
 cd otelcol-contrib/
-cd ../config.yaml .
+cp ../config.yaml .
 ./otelcol-contrib --config ./config.yaml &> otelcol-output.log & echo "$!" > otel-pid
 helm repo add signoz https://charts.signoz.io
+cd ..
 helm install my-release signoz/k8s-infra -f override-values.yaml
 
 # ─── 10. Done! ───────────────────────────────────────────────────────────────
