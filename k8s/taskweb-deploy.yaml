@@ -1,0 +1,93 @@
+---
+# 1️⃣ Backend Deployment (Flask-ToDo-List)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: traceassist
+  labels:
+    app: backend
+  annotations:
+    # track revisions
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+      annotations:
+        # enable OTel injection
+        instrumentation.opentelemetry.io/inject: "true"
+        instrumentation.opentelemetry.io/inject-python: "true"
+    spec:
+      serviceAccountName: traceassist-sa
+      containers:
+        - name: backend
+          image: taskweb/backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+---
+# 2️⃣ Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: traceassist
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+# 3️⃣ Frontend Deployment (React)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: traceassist
+  labels:
+    app: frontend
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+      annotations:
+        instrumentation.opentelemetry.io/inject: "true"
+        instrumentation.opentelemetry.io/inject-nodejs: "true"
+    spec:
+      serviceAccountName: traceassist-sa
+      containers:
+        - name: frontend
+          image: taskweb/frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+---
+# 4️⃣ Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: traceassist
+spec:
+  type: ClusterIP
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+
