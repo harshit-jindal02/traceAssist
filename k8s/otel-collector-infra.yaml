@@ -79,7 +79,7 @@ spec:
         tls:
           insecure: false
         headers:
-          signoz-ingestion-key: "e9bfcba0-a5a1-4d45-b2d5-38d332625ac8"
+          signoz-ingestion-key: "82b0858a-0573-4057-9848-01b6f0733956"
 
     service:
       pipelines:
